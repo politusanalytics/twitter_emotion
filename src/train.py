@@ -69,7 +69,7 @@ for (i, label) in enumerate(label_list):
     idx_to_label[i] = label
 
 tokenizer = None
-criterion = torch.nn.BCEWithLogitsLoss() if len(label_list) == 2 else torch.nn.CrossEntropyLoss(ignore_index=-1)
+criterion = torch.nn.BCEWithLogitsLoss()
 
 def test_model(encoder, classifier, dataloader):
     all_preds = []
@@ -90,21 +90,25 @@ def test_model(encoder, classifier, dataloader):
 
         eval_loss += tmp_eval_loss.mean().item()
 
-        if len(label_list) == 2:
-            curr_preds = torch.sigmoid(out).detach().cpu().numpy().flatten()
-            curr_preds = [int(x >= positive_threshold) for x in curr_preds]
-            all_preds += curr_preds
-        else:
-            out = out.detach().cpu().numpy()
-            all_preds += np.argmax(out, axis=1).tolist()
+        # curr_preds = torch.sigmoid(out).detach().cpu().numpy().tolist()
+        # curr_preds = [[int(x >= positive_threshold) for x in preds] for preds in curr_preds]
+        # all_preds += curr_preds
+
+        # label_ids = label_ids.to('cpu').numpy().tolist()
+        # all_label_ids += label_ids
+
+        # Multi-label f1 does not work in this version. So we just flatten our matrix.
+        curr_preds = torch.sigmoid(out).detach().cpu().numpy().flatten().tolist()
+        curr_preds = [int(x >= positive_threshold) for x in curr_preds]
+        all_preds += curr_preds
 
         label_ids = label_ids.to('cpu').numpy().flatten().tolist()
         all_label_ids += label_ids
 
         nb_eval_steps += 1
 
-    precision, recall, f1, _ = precision_recall_fscore_support(all_label_ids, all_preds, average="macro", labels=list(range(0,len(label_list))))
-    precision_micro, recall_micro, f1_micro, _ = precision_recall_fscore_support(all_label_ids, all_preds, average="micro", labels=list(range(0,len(label_list))))
+    precision, recall, f1, _ = precision_recall_fscore_support(all_label_ids, all_preds, average="macro") #, labels=list(range(0,len(label_list))))
+    precision_micro, recall_micro, f1_micro, _ = precision_recall_fscore_support(all_label_ids, all_preds, average="micro") #, labels=list(range(0,len(label_list))))
     mcc = matthews_corrcoef(all_preds, all_label_ids)
     eval_loss /= nb_eval_steps
     result = {"precision_macro": precision,
@@ -131,21 +135,12 @@ def model_predict(encoder, classifier, dataloader):
         with torch.no_grad():
             out = classifier(embeddings)
 
-        if len(label_list) == 2:
-            curr_preds = torch.sigmoid(out).detach().cpu().numpy().flatten()
-            if return_probabilities:
-                curr_preds = [round(float(x), 4) for x in curr_preds]
-            else:
-                curr_preds = [idx_to_label[int(x >= positive_threshold)] for x in curr_preds]
-            all_preds += curr_preds
-
+        curr_preds = torch.sigmoid(out).detach().cpu().numpy().tolist()
+        if return_probabilities:
+            curr_preds = [[round(float(x), 4) for x in preds] for preds in curr_preds]
         else:
-            out = out.detach().cpu().numpy()
-            if return_probabilities:
-                curr_preds = [probs for probs in softmax(out, axis=1).tolist()] # a list of lists(of probabilities)
-            else:
-                curr_preds = [idx_to_label[pred] for pred in np.argmax(out, axis=1).tolist()] # a list of labels
-            all_preds += curr_preds
+            curr_preds = [[idx_to_label[i] for i, x in enumerate(preds) if x >= positive_threshold] for preds in curr_preds]
+        all_preds += curr_preds
 
     return all_preds
 
@@ -155,7 +150,7 @@ def build_model(train_examples, dev_examples, pretrained_model, n_epochs=10, cur
 
     tokenizer = AutoTokenizer.from_pretrained(pretrained_model)
     encoder = AutoModel.from_pretrained(pretrained_model)
-    classifier = torch.nn.Linear(encoder.config.hidden_size, 1 if len(label_list) == 2 else len(label_list))
+    classifier = torch.nn.Linear(encoder.config.hidden_size, len(label_list))
 
     train_dataset = TransformersData(train_examples, label_to_idx, tokenizer, max_seq_length=max_seq_length, has_token_type_ids=has_token_type_ids)
     train_dataloader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
@@ -255,7 +250,7 @@ if __name__ == '__main__':
     else:
         tokenizer = AutoTokenizer.from_pretrained(pretrained_transformers_model)
         encoder = AutoModel.from_pretrained(pretrained_transformers_model)
-        classifier = torch.nn.Linear(encoder.config.hidden_size, 1 if len(label_list) == 2 else len(label_list))
+        classifier = torch.nn.Linear(encoder.config.hidden_size, len(label_list))
 
         classifier.to(device)
         encoder.to(device)

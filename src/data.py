@@ -25,10 +25,9 @@ class TransformersData(torch.utils.data.Dataset):
             token_type_ids = torch.tensor(encoded_input["token_type_ids"], dtype=torch.long)
 
         if self.with_label:
-            if len(self.label_map) == 2:
-                label_ids = torch.FloatTensor([self.label_map[ex[1]]])
-            else:
-                label_ids = torch.tensor(self.label_map[ex[1]], dtype=torch.long)
+            label_ids = torch.zeros(len(self.label_map))
+            for label_name in ex[1]:
+                label_ids[self.label_map[label_name]] = 1.0
 
             if self.has_token_type_ids:
                 return input_ids, input_mask, token_type_ids, label_ids
@@ -50,8 +49,8 @@ def get_examples(filename, with_label=True):
         line = json.loads(line)
         text = str(line["text"])
         if with_label:
-            label = str(line["label"])
-            examples.append([text, label])
+            labels = line["labels"] # should be a list of label names
+            examples.append([text, labels])
         else:
             examples.append([text])
 
