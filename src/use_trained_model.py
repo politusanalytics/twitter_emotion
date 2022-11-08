@@ -16,12 +16,25 @@ input_filename = sys.argv[1] # Should be json or json.gz file in json line forma
 output_filename = sys.argv[2]
 
 # MUST SET THESE VALUES
-pretrained_transformers_model = "xlm-roberta-base"
-max_seq_length = 512
-batch_size = 64
-idx_to_label = ["category1", "category2", "category3"]
-encoder_path = ""
-classifier_path = ""
+pretrained_transformers_model = "cardiffnlp/twitter-xlm-roberta-base"
+max_seq_length = 64
+batch_size = 512
+repo_path = "/home/username/twitter_emotion"
+
+# # GoEmotions
+# idx_to_label = ['admiration','amusement', 'anger', 'annoyance', 'approval', 'caring', 'confusion',
+#                 'curiosity', 'desire', 'disappointment', 'disapproval', 'disgust', 'embarrassment',
+#                 'excitement', 'fear', 'gratitude', 'grief', 'joy', 'love', 'nervousness', 'optimism',
+#                 'pride', 'realization', 'relief', 'remorse', 'sadness', 'surprise', 'neutral']
+# encoder_path = "/models/best_model/go_emotions_encoder_cardiffnlp_twitter-xlm-roberta-base_50.pt"
+# classifier_path = "/models/best_model/go_emotions_classifier_cardiffnlp_twitter-xlm-roberta-base_50.pt"
+
+# Affect in Tweets
+idx_to_label = ["anger", "anticipation", "disgust", "fear", "joy", "love", "optimism", "pessimism",
+                "sadness", "surprise", "trust"]
+# encoder_path = "/models/best_model/affect_in_tweets_encoder_cardiffnlp_twitter-xlm-roberta-base_.pt"
+# classifier_path = "/models/best_model/affect_in_tweets_classifier_cardiffnlp_twitter-xlm-roberta-base_.pt"
+
 device = torch.device("cuda")
 
 # OPTIONS
