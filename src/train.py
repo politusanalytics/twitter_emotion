@@ -12,32 +12,47 @@ import sys
 # import pandas as pd
 
 # INPUTS
-pretrained_transformers_model = sys.argv[1] # For example: "xlm-roberta-base"
+pretrained_transformers_model = sys.argv[1] # For example: "cardiffnlp/twitter-xlm-roberta-base"
 seed = int(sys.argv[2])
-max_seq_length = int(sys.argv[3]) # max length of a document (in tokens)
-batch_size = int(sys.argv[4])
-dev_ratio = float(sys.argv[5])
 
 # MUST SET THESE VALUES
-repo_path = "/path/to/this/repo"
-train_filename = repo_path + "/data/train_examples.json" # sys.argv[1]
-test_filename = repo_path + "/data/test_examples.json"
-# test_filename = repo_path + "/data/examples_to_be_predicted.json"
-label_list = ["category1", "category2", "category3"]
+max_seq_length = 64 # max length of a document (in tokens)
+batch_size = 256
+dev_ratio = 0.1
+
+repo_path = "/home/username/twitter_emotion"
 only_test = False # Only perform testing
 predict = False # Predict instead of testing
 has_token_type_ids = False
+
+
+# # GoEmotions
+# train_filename = repo_path + "/data/go_emotions/train.json"
+# test_filename = repo_path + "/data/go_emotions/test.json"
+# label_list = ['admiration','amusement', 'anger', 'annoyance', 'approval', 'caring', 'confusion',
+#               'curiosity', 'desire', 'disappointment', 'disapproval', 'disgust', 'embarrassment',
+#               'excitement', 'fear', 'gratitude', 'grief', 'joy', 'love', 'nervousness', 'optimism',
+#               'pride', 'realization', 'relief', 'remorse', 'sadness', 'surprise', 'neutral']
+# dev_set_splitting = repo_path + "/data/go_emotions/dev.json"
+
+# Affect in Tweets
+train_filename = repo_path + "/data/affect_in_tweets/train.json"
+test_filename = repo_path + "/data/affect_in_tweets/test.json"
+label_list = ["anger", "anticipation", "disgust", "fear", "joy", "love", "optimism", "pessimism",
+              "sadness", "surprise", "trust"]
+dev_set_splitting = repo_path + "/data/affect_in_tweets/dev.json"
+
 
 # SETTINGS
 learning_rate = 2e-5
 dev_metric = "f1_macro"
 num_epochs = 30
-dev_set_splitting = "random" # random, or any filename
+# dev_set_splitting = "random"
 use_gpu = True
 device_ids = [0, 1, 2, 3, 4, 5, 6, 7] # if not multi-gpu then pass a single number such as [0]
 positive_threshold = 0.5 # Outputted probabilities bigger than this number is considered positive in case of binary classifications
 return_probabilities = False # whether or not to return probabilities instead of labels when predicting
-model_path = "{}_{}_{}_{:.2f}_{}.pt".format(pretrained_transformers_model.replace("/", "_"), max_seq_length, batch_size, dev_ratio, seed)
+model_path = "{}_{}.pt".format(pretrained_transformers_model.replace("/", "_"), seed)
 
 # optional, used in testing
 classifier_path = ""# repo_path + "/models/best_models/20220528_classifier_sentence-transformers_paraphrase-xlm-r-multilingual-v1_44.pt"
