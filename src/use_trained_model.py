@@ -36,7 +36,7 @@ has_token_type_ids = config.type_vocab_size > 1
 encoder = AutoModel.from_pretrained(pretrained_transformers_model)
 encoder.to(device)
 encoder.load_state_dict(torch.load(encoder_path, map_location=device))
-classifier = torch.nn.Linear(encoder.config.hidden_size, 1 if len(idx_to_label) == 2 else len(idx_to_label))
+classifier = torch.nn.Linear(encoder.config.hidden_size, len(idx_to_label))
 classifier.to(device)
 classifier.load_state_dict(torch.load(classifier_path, map_location=device))
 
@@ -54,21 +54,13 @@ def model_predict(batch):
 
     out = classifier(embeddings)
 
-    if len(idx_to_label) == 2:
-        preds = torch.sigmoid(out).detach().cpu().numpy().flatten()
-        if return_probabilities:
-            preds = [round(float(x), 4) for x in preds]
-        else:
-            preds = [idx_to_label[int(x >= positive_threshold)] for x in preds]
-
+    all_preds = torch.sigmoid(out).detach().cpu().numpy().tolist()
+    if return_probabilities:
+        all_preds = [[round(float(x), 4) for x in preds] for preds in all_preds]
     else:
-        out = out.detach().cpu().numpy()
-        if return_probabilities:
-            preds = [probs for probs in softmax(out, axis=1).tolist()] # a list of lists(of probabilities)
-        else:
-            preds = [idx_to_label[pred] for pred in np.argmax(out, axis=1).tolist()] # a list of labels
+        all_preds = [[idx_to_label[i] for i, x in enumerate(preds) if x >= positive_threshold] for preds in all_preds]
 
-    return preds
+    return all_preds
 
 # !!!IMPORTANT!!!
 # Change this according to the json line format.
