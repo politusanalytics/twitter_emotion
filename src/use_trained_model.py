@@ -5,6 +5,7 @@ so that we can process bigger files.
 """
 
 from transformers import AutoModel, AutoTokenizer, AutoConfig
+from commons import MLP
 import sys
 import numpy as np
 import json
@@ -36,7 +37,7 @@ has_token_type_ids = config.type_vocab_size > 1
 encoder = AutoModel.from_pretrained(pretrained_transformers_model)
 encoder.to(device)
 encoder.load_state_dict(torch.load(encoder_path, map_location=device))
-classifier = torch.nn.Linear(encoder.config.hidden_size, len(idx_to_label))
+classifier = MLP(encoder.config.hidden_size, encoder.config.hidden_size*4, len(idx_to_label))
 classifier.to(device)
 classifier.load_state_dict(torch.load(classifier_path, map_location=device))
 

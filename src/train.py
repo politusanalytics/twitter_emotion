@@ -1,6 +1,7 @@
 from sklearn.metrics import precision_recall_fscore_support, matthews_corrcoef
 import torch
 from transformers import AutoModel, AutoTokenizer, get_linear_schedule_with_warmup
+from commons import MLP
 from data import get_examples, TransformersData
 from torch.utils.data import DataLoader
 import numpy as np
@@ -150,7 +151,7 @@ def build_model(train_examples, dev_examples, pretrained_model, n_epochs=10, cur
 
     tokenizer = AutoTokenizer.from_pretrained(pretrained_model)
     encoder = AutoModel.from_pretrained(pretrained_model)
-    classifier = torch.nn.Linear(encoder.config.hidden_size, len(label_list))
+    classifier = MLP(encoder.config.hidden_size, encoder.config.hidden_size*4, len(label_list))
 
     train_dataset = TransformersData(train_examples, label_to_idx, tokenizer, max_seq_length=max_seq_length, has_token_type_ids=has_token_type_ids)
     train_dataloader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
@@ -250,7 +251,7 @@ if __name__ == '__main__':
     else:
         tokenizer = AutoTokenizer.from_pretrained(pretrained_transformers_model)
         encoder = AutoModel.from_pretrained(pretrained_transformers_model)
-        classifier = torch.nn.Linear(encoder.config.hidden_size, len(label_list))
+        classifier = MLP(encoder.config.hidden_size, encoder.config.hidden_size*4, len(label_list))
 
         classifier.to(device)
         encoder.to(device)
