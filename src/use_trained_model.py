@@ -13,10 +13,11 @@ import torch
 import gzip
 
 # INPUTS
-input_filename = sys.argv[1] # Should be json or json.gz file in json line format.
-output_filename = sys.argv[2]
+# If database: input "database". If input filename: should be json or json.gz file in json line format.
+database_or_input_filename = sys.argv[1]
 
 # MUST SET THESE VALUES
+output_filename = "out.json"
 pretrained_transformers_model = "xlm-roberta-base"
 max_seq_length = 512
 batch_size = 64
@@ -63,42 +64,104 @@ def model_predict(batch):
 
     return all_preds
 
+def preprocess(text): # Preprocess text (username and link placeholders)
+    new_text = []
+    for t in text.split(" "):
+        t = '@user' if t.startswith('@') and len(t) > 1 else t
+        t = 'http' if t.startswith('http') else t
+        new_text.append(t)
+    return " ".join(new_text)
+
 # !!!IMPORTANT!!!
 # Change this according to the json line format.
 # Here the format for every line is like:
 # {id_str: text}
 def read_json_line(data):
-    def preprocess(text): # Preprocess text (username and link placeholders)
-        new_text = []
-        for t in text.split(" "):
-            t = '@user' if t.startswith('@') and len(t) > 1 else t
-            t = 'http' if t.startswith('http') else t
-            new_text.append(t)
-        return " ".join(new_text)
-
     id_str = list(data.keys())[0]
     text = preprocess(data[id_str])
 
     return id_str, text
 
 if __name__ == "__main__":
-    output_file = open(output_filename, "w", encoding="utf-8")
-    if input_filename.endswith(".json.gz"):
-        input_file = gzip.open(input_filename, "rt", encoding="utf-8")
-    elif input_filename.endswith(".json"):
-        input_file = open(input_filename, "r", encoding="utf-8")
-    else:
-        raise("File extension should be 'json' or 'json.gz'!")
+    # TODO: add progress bar
 
-    curr_batch = []
-    for i, line in enumerate(input_file):
-        data = json.loads(line)
-        id_str, text = read_json_line(data)
+    if database_or_input_filename == "database": # if database
+        import pymongo
 
-        if len(text) > 0:
-            curr_batch.append({"id_str": id_str, "text": text})
+        # Connect to mongodb
+        mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
+        db = mongo_client["politus_twitter"]
+        tweet_col = db["tweets"]
 
-        if len(curr_batch) == batch_size:
+        # NOTE: This find can be changed according to the task.
+        tweets_to_predict = tweet_col.find({task_name: None}, ["_id", "text"])
+
+        curr_batch = []
+        for i, tweet in enumerate(tweets_to_predict):
+            id_str = tweet["_id"]
+            text = preprocess(tweet["text"])
+
+            if len(text) > 0:
+                curr_batch.append({"_id": id_str, "text": text})
+
+            if len(curr_batch) == batch_size:
+                texts = [d["text"] for d in curr_batch]
+                inputs = tokenizer(texts, return_tensors="pt", padding="max_length", truncation=True,
+                                   max_length=max_seq_length)
+                preds = model_predict(inputs)
+                # TODO: Think about multiple updates at the same time
+                for pred_idx, pred in enumerate(preds):
+                    curr_d = curr_batch[pred_idx]
+                    tweet_col.update_one({"_id": curr_d["_id"]}, {"$set": {task_name: pred}})
+
+                curr_batch = []
+
+        # Last incomplete batch, if any
+        if len(curr_batch) != 0:
+            texts = [d["text"] for d in curr_batch]
+            inputs = tokenizer(texts, return_tensors="pt", padding="max_length", truncation=True,
+                               max_length=max_seq_length)
+            preds = model_predict(inputs)
+            for pred_idx, pred in enumerate(preds):
+                curr_d = curr_batch[pred_idx]
+                tweet_col.update_one({"_id": curr_d["_id"]}, {"$set": {task_name: pred}})
+
+
+    else: # if filename
+
+        output_file = open(output_filename, "w", encoding="utf-8")
+        if database_or_input_filename.endswith(".json.gz"):
+            input_file = gzip.open(database_or_input_filename, "rt", encoding="utf-8")
+        elif database_or_input_filename.endswith(".json"):
+            input_file = open(database_or_input_filename, "r", encoding="utf-8")
+        else:
+            raise("File extension should be 'json' or 'json.gz'!")
+
+        curr_batch = []
+        for i, line in enumerate(input_file):
+            data = json.loads(line)
+            id_str, text = read_json_line(data)
+
+            if len(text) > 0:
+                curr_batch.append({"id_str": id_str, "text": text})
+
+            if len(curr_batch) == batch_size:
+                texts = [d["text"] for d in curr_batch]
+                inputs = tokenizer(texts, return_tensors="pt", padding="max_length", truncation=True,
+                                   max_length=max_seq_length)
+                preds = model_predict(inputs)
+                for pred_idx, pred in enumerate(preds):
+                    curr_d = curr_batch[pred_idx]
+                    curr_d.pop("text") # No need for text in the output.
+                    curr_d["prediction"] = pred
+                    output_file.write(json.dumps(curr_d, ensure_ascii=False) + "\n")
+
+                curr_batch = []
+
+        input_file.close()
+
+        # Last incomplete batch, if any
+        if len(curr_batch) != 0:
             texts = [d["text"] for d in curr_batch]
             inputs = tokenizer(texts, return_tensors="pt", padding="max_length", truncation=True,
                                max_length=max_seq_length)
@@ -109,20 +172,4 @@ if __name__ == "__main__":
                 curr_d["prediction"] = pred
                 output_file.write(json.dumps(curr_d, ensure_ascii=False) + "\n")
 
-            curr_batch = []
-
-    input_file.close()
-
-    # Last incomplete batch, if any
-    if len(curr_batch) != 0:
-        texts = [d["text"] for d in curr_batch]
-        inputs = tokenizer(texts, return_tensors="pt", padding="max_length", truncation=True,
-                           max_length=max_seq_length)
-        preds = model_predict(inputs)
-        for pred_idx, pred in enumerate(preds):
-            curr_d = curr_batch[pred_idx]
-            curr_d.pop("text") # No need for text in the output.
-            curr_d["prediction"] = pred
-            output_file.write(json.dumps(curr_d, ensure_ascii=False) + "\n")
-
-    output_file.close()
+        output_file.close()

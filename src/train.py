@@ -24,10 +24,16 @@ repo_path = "/path/to/this/repo"
 train_filename = repo_path + "/data/train_examples.json" # sys.argv[1]
 test_filename = repo_path + "/data/test_examples.json"
 # test_filename = repo_path + "/data/examples_to_be_predicted.json"
-label_list = ["category1", "category2", "category3"]
 only_test = False # Only perform testing
 predict = False # Predict instead of testing
 has_token_type_ids = False
+
+label_list = ["category1", "category2", "category3"]
+label_to_idx = {}
+idx_to_label = {}
+for (i, label) in enumerate(label_list):
+    label_to_idx[label] = i
+    idx_to_label[i] = label
 
 # SETTINGS
 learning_rate = 2e-5
@@ -62,12 +68,6 @@ np.random.seed(seed)
 torch.manual_seed(seed)
 if device.type == "cuda":
     torch.cuda.manual_seed_all(seed)
-
-label_to_idx = {}
-idx_to_label = {}
-for (i, label) in enumerate(label_list):
-    label_to_idx[label] = i
-    idx_to_label[i] = label
 
 tokenizer = None
 criterion = torch.nn.BCEWithLogitsLoss()
@@ -247,7 +247,10 @@ if __name__ == '__main__':
     if not only_test:
         encoder, classifier = build_model(train_examples, dev_examples, pretrained_transformers_model, n_epochs=num_epochs, curr_model_path=model_path)
         classifier.load_state_dict(torch.load(repo_path + "/models/classifier_" + model_path))
-        encoder.module.load_state_dict(torch.load(repo_path + "/models/encoder_" + model_path))
+        if torch.cuda.device_count() > 1 and device.type == "cuda" and len(device_ids) > 1:
+            encoder.module.load_state_dict(torch.load(repo_path + "/models/encoder_" + model_path))
+        else:
+            encoder.load_state_dict(torch.load(repo_path + "/models/encoder_" + model_path))
     else:
         tokenizer = AutoTokenizer.from_pretrained(pretrained_transformers_model)
         encoder = AutoModel.from_pretrained(pretrained_transformers_model)
