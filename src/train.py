@@ -15,10 +15,12 @@ import sys
 # INPUTS
 pretrained_transformers_model = sys.argv[1] # For example: "cardiffnlp/twitter-xlm-roberta-base"
 seed = int(sys.argv[2])
+dataset_name = sys.argv[3]
+device_ids = [int(i) for i in sys.argv[4].split(",")]
 
 # MUST SET THESE VALUES
 max_seq_length = 64 # max length of a document (in tokens)
-batch_size = 256
+batch_size = 128
 dev_ratio = 0.1
 
 repo_path = "/home/username/twitter_emotion"
@@ -26,21 +28,44 @@ only_test = False # Only perform testing
 predict = False # Predict instead of testing
 has_token_type_ids = False
 
-# # GoEmotions
-# train_filename = repo_path + "/data/go_emotions/train.json"
-# test_filename = repo_path + "/data/go_emotions/test.json"
-# label_list = ['admiration','amusement', 'anger', 'annoyance', 'approval', 'caring', 'confusion',
-#               'curiosity', 'desire', 'disappointment', 'disapproval', 'disgust', 'embarrassment',
-#               'excitement', 'fear', 'gratitude', 'grief', 'joy', 'love', 'nervousness', 'optimism',
-#               'pride', 'realization', 'relief', 'remorse', 'sadness', 'surprise', 'neutral']
-# dev_set_splitting = repo_path + "/data/go_emotions/dev.json"
+train_filename = "{}/data/{}/train.json".format(repo_path, dataset_name)
+test_filename = "{}/data/{}/test.json".format(repo_path, dataset_name)
+dev_set_splitting = "{}/data/{}/dev.json".format(repo_path, dataset_name)
 
-# Affect in Tweets
-train_filename = repo_path + "/data/affect_in_tweets/train.json"
-test_filename = repo_path + "/data/affect_in_tweets/test.json"
-label_list = ["anger", "anticipation", "disgust", "fear", "joy", "love", "optimism", "pessimism",
-              "sadness", "surprise", "trust"]
-dev_set_splitting = repo_path + "/data/affect_in_tweets/dev.json"
+if dataset_name == "go_emotions": # GoEmotions
+    label_list = ['admiration','amusement', 'anger', 'annoyance', 'approval', 'caring', 'confusion',
+                  'curiosity', 'desire', 'disappointment', 'disapproval', 'disgust', 'embarrassment',
+                  'excitement', 'fear', 'gratitude', 'grief', 'joy', 'love', 'nervousness', 'optimism',
+                  'pride', 'realization', 'relief', 'remorse', 'sadness', 'surprise', 'neutral']
+elif dataset_name == "affect_in_tweets": # AffectInTweets
+    label_list = ["anger", "anticipation", "disgust", "fear", "joy", "love", "optimism", "pessimism",
+                  "sadness", "surprise", "trust"]
+elif dataset_name == "go_emotions_our_set": # Our set of go emotions
+    label_list = ['anger', 'anxiety', 'approval', 'desire', 'disapproval', 'disgust', 'embarrassment',
+                  'fear', 'gratitude', 'joy', 'love', 'optimism', 'remorse', 'sadness',
+                  'surprise', 'neutral']
+    go_emotions_to_our_set = {'admiration': '','amusement': 'joy', 'anger': 'anger', 'annoyance': 'anger',
+                              'approval': 'approval', 'caring': '', 'confusion': '', 'curiosity': '',
+                              'desire': 'desire', 'disappointment': 'sadness', 'disapproval': 'disapproval',
+                              'disgust': 'disgust', 'embarrassment': 'embarrassment', 'excitement': 'joy',
+                              'fear': 'fear', 'gratitude': 'gratitude', 'grief': '', 'joy': 'joy',
+                              'love': 'love', 'nervousness': 'nervousness', 'optimism': 'optimism',
+                              'pride': '', 'realization': '', 'relief': '', 'remorse': 'remorse',
+                              'sadness': 'sadness', 'surprise': 'surprise', 'neutral': 'neutral'}
+elif dataset_name == "politus":
+    train_filename = "{}/data/annotation/3annotated_20230320/train.json".format(repo_path)
+    test_filename = "{}/data/annotation/3annotated_20230320/test.json".format(repo_path)
+    dev_set_splitting = "random"
+    # turkish_to_english = {"notr": "neutral", "mutluluk": "joy", "sevgi": "love", "umut": "hope",
+    #                       "minnet": "gratitude", "saskinlik": "surprise", "uzuntu": "sadness",
+    #                       "kaygi": "nervousness", "korku": "fear", }
+    label_list = ["notr", "mutluluk", "sevgi", "umut", "minnet", "saskinlik", "uzuntu", "kaygi",
+                  "korku", "umutsuzluk", "utanc", "pismanlik", "ofke", "igrenme", "arzu",
+                  "onaylama", "onaylamama"]
+else:
+    raise("Dataset name {} is not known!".format(dataset_name))
+
+# test_filename = "{}/data/20220528_20211101_self_contained_tweets_pious_adj_test_wEmotionPredictions.json".format(repo_path)
 
 # SETTINGS
 learning_rate = 2e-5
@@ -48,14 +73,16 @@ dev_metric = "f1_macro"
 num_epochs = 30
 # dev_set_splitting = "random"
 use_gpu = True
-device_ids = [0, 1, 2, 3, 4, 5, 6, 7] # if not multi-gpu then pass a single number such as [0]
+# device_ids = [0, 1, 2, 3, 4, 5, 6, 7] # if not multi-gpu then pass a single number such as [0]
 positive_threshold = 0.5 # Outputted probabilities bigger than this number is considered positive in case of binary classifications
 return_probabilities = False # whether or not to return probabilities instead of labels when predicting
-model_path = "{}_{}.pt".format(pretrained_transformers_model.replace("/", "_"), seed)
+model_path = "{}_{}_{}.pt".format(dataset_name, pretrained_transformers_model.replace("/", "_"), seed)
 
 # optional, used in testing
-classifier_path = ""# repo_path + "/models/best_models/20220528_classifier_sentence-transformers_paraphrase-xlm-r-multilingual-v1_44.pt"
-encoder_path = ""#repo_path + "/models/best_models/20220528_encoder_sentence-transformers_paraphrase-xlm-r-multilingual-v1_44.pt"
+# classifier_path = repo_path + "/models/best_models/go_emotions_classifier_cardiffnlp_twitter-xlm-roberta-base_43.pt"
+# encoder_path = repo_path + "/models/best_models/go_emotions_encoder_cardiffnlp_twitter-xlm-roberta-base_43.pt"
+classifier_path = ""
+encoder_path = ""
 
 if not classifier_path:
     classifier_path =  repo_path + "/models/classifier_" + model_path
@@ -135,6 +162,54 @@ def test_model(encoder, classifier, dataloader):
 
     return result, eval_loss
 
+# Test for labels individually
+def test_model2(encoder, classifier, dataloader):
+    all_preds = {i: [] for i in range(len(label_list))}
+    all_label_ids = {i: [] for i in range(len(label_list))}
+    eval_loss = 0
+    nb_eval_steps = 0
+    for val_step, batch in enumerate(dataloader):
+        if has_token_type_ids:
+            input_ids, input_mask, token_type_ids, label_ids = tuple(t.to(device) for t in batch)
+            embeddings = encoder(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids)[1]
+        else:
+            input_ids, input_mask, label_ids = tuple(t.to(device) for t in batch)
+            embeddings = encoder(input_ids, attention_mask=input_mask)[1]
+
+        with torch.no_grad():
+            out = classifier(embeddings)
+            tmp_eval_loss = criterion(out, label_ids)
+
+        eval_loss += tmp_eval_loss.mean().item()
+
+        label_ids = label_ids.to('cpu').numpy().tolist()
+        curr_preds = torch.sigmoid(out).detach().cpu().numpy().tolist()
+        for i, preds in enumerate(curr_preds):
+            for ii, pred in enumerate(preds):
+                all_preds[ii].append(int(pred >= positive_threshold))
+                all_label_ids[ii].append(int(label_ids[i][ii]))
+
+        nb_eval_steps += 1
+
+    result = {}
+    for i in all_preds.keys():
+        curr_label = idx_to_label[i]
+
+        curr_label_preds = all_preds[i]
+        curr_label_gold = all_label_ids[i]
+
+        precision, recall, f1, _ = precision_recall_fscore_support(curr_label_gold, curr_label_preds, average="macro")
+        precision_micro, recall_micro, f1_micro, _ = precision_recall_fscore_support(curr_label_gold, curr_label_preds, average="micro")
+        mcc = matthews_corrcoef(curr_label_preds, curr_label_gold)
+        result["{}_precision_macro".format(curr_label)] = precision
+        result["{}_recall_macro".format(curr_label)] = recall
+        result["{}_f1_macro".format(curr_label)] = f1
+        result["{}_precision_micro".format(curr_label)] = precision_micro
+        result["{}_recall_micro".format(curr_label)] = recall_micro
+        result["{}_f1_micro".format(curr_label)] = f1_micro
+        result["{}_mcc".format(curr_label)] = mcc
+
+    return result, eval_loss
 
 def model_predict(encoder, classifier, dataloader):
     all_preds = []
@@ -260,7 +335,7 @@ if __name__ == '__main__':
     if not only_test:
         encoder, classifier = build_model(train_examples, dev_examples, pretrained_transformers_model, n_epochs=num_epochs, curr_model_path=model_path)
         classifier.load_state_dict(torch.load(repo_path + "/models/classifier_" + model_path))
-        if torch.cuda.device_count() > 1 and device.type == "cuda" and len(device_ids) > 1:
+        if hasattr(encoder, 'module'):
             encoder.module.load_state_dict(torch.load(repo_path + "/models/encoder_" + model_path))
         else:
             encoder.load_state_dict(torch.load(repo_path + "/models/encoder_" + model_path))
@@ -299,11 +374,14 @@ if __name__ == '__main__':
         test_dataset = TransformersData(test_examples, label_to_idx, tokenizer, max_seq_length=max_seq_length, has_token_type_ids=has_token_type_ids)
         test_dataloader = DataLoader(dataset=test_dataset, batch_size=batch_size)
 
-        result, test_loss = test_model(encoder, classifier, test_dataloader)
+        result, test_loss = test_model2(encoder, classifier, test_dataloader)
         result["test_loss"] = test_loss
 
         print("***** TEST RESULTS *****")
         for key in sorted(result.keys()):
             print("  %s = %.6f" %(key, result[key]))
 
+        result, test_loss = test_model(encoder, classifier, test_dataloader)
+        for key in sorted(result.keys()):
+            print("  %s = %.6f" %(key, result[key]))
         print("TEST SCORE: %.6f" %result[dev_metric])

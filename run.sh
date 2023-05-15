@@ -1,21 +1,43 @@
+echo "====== TRANSFORMERS MODEL: cardiffnlp/twitter-xlm-roberta-base, Dataset: GoEmotions ======"
+echo "=== SEED: 42 ==="
+python src/train.py cardiffnlp/twitter-xlm-roberta-base 42 go_emotions
+echo "=== SEED: 43 ==="
+python src/train.py cardiffnlp/twitter-xlm-roberta-base 43 go_emotions
+echo "=== SEED: 44 ==="
+python src/train.py cardiffnlp/twitter-xlm-roberta-base 44 go_emotions
+echo "=== SEED: 45 ==="
+python src/train.py cardiffnlp/twitter-xlm-roberta-base 45 go_emotions
+echo "=== SEED: 46 ==="
+python src/train.py cardiffnlp/twitter-xlm-roberta-base 46 go_emotions
+echo "=== SEED: 47 ==="
+python src/train.py cardiffnlp/twitter-xlm-roberta-base 47 go_emotions
+echo "=== SEED: 48 ==="
+python src/train.py cardiffnlp/twitter-xlm-roberta-base 48 go_emotions
+echo "=== SEED: 49 ==="
+python src/train.py cardiffnlp/twitter-xlm-roberta-base 49 go_emotions
+echo "=== SEED: 50 ==="
+python src/train.py cardiffnlp/twitter-xlm-roberta-base 50 go_emotions
+echo "=== SEED: 51 ==="
+python src/train.py cardiffnlp/twitter-xlm-roberta-base 51 go_emotions
+
 echo "====== TRANSFORMERS MODEL: cardiffnlp/twitter-xlm-roberta-base, Dataset: AffectInTweets ======"
 echo "=== SEED: 42 ==="
-python src/train.py cardiffnlp/twitter-xlm-roberta-base 42
+python src/train.py cardiffnlp/twitter-xlm-roberta-base 42 affect_in_tweets
 echo "=== SEED: 43 ==="
-python src/train.py cardiffnlp/twitter-xlm-roberta-base 43
+python src/train.py cardiffnlp/twitter-xlm-roberta-base 43 affect_in_tweets
 echo "=== SEED: 44 ==="
-python src/train.py cardiffnlp/twitter-xlm-roberta-base 44
+python src/train.py cardiffnlp/twitter-xlm-roberta-base 44 affect_in_tweets
 echo "=== SEED: 45 ==="
-python src/train.py cardiffnlp/twitter-xlm-roberta-base 45
+python src/train.py cardiffnlp/twitter-xlm-roberta-base 45 affect_in_tweets
 echo "=== SEED: 46 ==="
-python src/train.py cardiffnlp/twitter-xlm-roberta-base 46
+python src/train.py cardiffnlp/twitter-xlm-roberta-base 46 affect_in_tweets
 echo "=== SEED: 47 ==="
-python src/train.py cardiffnlp/twitter-xlm-roberta-base 47
+python src/train.py cardiffnlp/twitter-xlm-roberta-base 47 affect_in_tweets
 echo "=== SEED: 48 ==="
-python src/train.py cardiffnlp/twitter-xlm-roberta-base 48
+python src/train.py cardiffnlp/twitter-xlm-roberta-base 48 affect_in_tweets
 echo "=== SEED: 49 ==="
-python src/train.py cardiffnlp/twitter-xlm-roberta-base 49
+python src/train.py cardiffnlp/twitter-xlm-roberta-base 49 affect_in_tweets
 echo "=== SEED: 50 ==="
-python src/train.py cardiffnlp/twitter-xlm-roberta-base 50
+python src/train.py cardiffnlp/twitter-xlm-roberta-base 50 affect_in_tweets
 echo "=== SEED: 51 ==="
-python src/train.py cardiffnlp/twitter-xlm-roberta-base 51
+python src/train.py cardiffnlp/twitter-xlm-roberta-base 51 affect_in_tweets

@@ -13,13 +13,13 @@ import torch
 import gzip
 
 # INPUTS
-# If database: input "database". If input filename: should be json or json.gz file in json line format.
 database_or_input_filename = sys.argv[1]
 
 # MUST SET THESE VALUES
-pretrained_transformers_model = "cardiffnlp/twitter-xlm-roberta-base"
+output_filename = "out.json"
+pretrained_transformers_model = "dbmdz/bert-base-turkish-128k-cased"
 max_seq_length = 64
-batch_size = 512
+batch_size = 1536
 repo_path = "/home/username/twitter_emotion"
 
 # # GoEmotions
@@ -27,14 +27,36 @@ repo_path = "/home/username/twitter_emotion"
 #                 'curiosity', 'desire', 'disappointment', 'disapproval', 'disgust', 'embarrassment',
 #                 'excitement', 'fear', 'gratitude', 'grief', 'joy', 'love', 'nervousness', 'optimism',
 #                 'pride', 'realization', 'relief', 'remorse', 'sadness', 'surprise', 'neutral']
-# encoder_path = "/models/best_model/go_emotions_encoder_cardiffnlp_twitter-xlm-roberta-base_50.pt"
-# classifier_path = "/models/best_model/go_emotions_classifier_cardiffnlp_twitter-xlm-roberta-base_50.pt"
+# encoder_path = "{}/models/best_models/go_emotions_encoder_cardiffnlp_twitter-xlm-roberta-base_43.pt".format(repo_path)
+# classifier_path = "{}/models/best_models/go_emotions_classifier_cardiffnlp_twitter-xlm-roberta-base_43.pt".format(repo_path)
 
-# Affect in Tweets
-idx_to_label = ["anger", "anticipation", "disgust", "fear", "joy", "love", "optimism", "pessimism",
-                "sadness", "surprise", "trust"]
-# encoder_path = "/models/best_model/affect_in_tweets_encoder_cardiffnlp_twitter-xlm-roberta-base_.pt"
-# classifier_path = "/models/best_model/affect_in_tweets_classifier_cardiffnlp_twitter-xlm-roberta-base_.pt"
+# # Affect in Tweets
+# idx_to_label = ["anger", "anticipation", "disgust", "fear", "joy", "love", "optimism", "pessimism",
+#                 "sadness", "surprise", "trust"]
+# encoder_path = "{}/models/best_models/affect_in_tweets_encoder_cardiffnlp_twitter-xlm-roberta-base_45.pt".format(repo_path)
+# classifier_path = "{}/models/best_models/affect_in_tweets_classifier_cardiffnlp_twitter-xlm-roberta-base_45.pt".format(repo_path)
+
+# Politus
+idx_to_label = ["notr", "mutluluk", "sevgi", "umut", "minnet", "saskinlik", "uzuntu", "kaygi", "korku",
+                "umutsuzluk", "utanc", "pismanlik", "ofke", "igrenme", "arzu", "onaylama", "onaylamama"]
+encoder_path = "{}/models/best_models/politus_encoder_dbmdz_bert-base-turkish-128k-cased_71.pt".format(repo_path)
+classifier_path = "{}/models/best_models/politus_classifier_dbmdz_bert-base-turkish-128k-cased_71.pt".format(repo_path)
+
+query = {"text": {"$nin": ["", None]}, "emotions": None}
+
+# See if there is anything to predict
+if database_or_input_filename == "database":
+    import pymongo
+    # Connect to mongodb
+    mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
+    db = mongo_client["politus_twitter"]
+    tweet_col = db["tweets"]
+
+    num_tweets_to_predict = tweet_col.count_documents(query)
+    if num_tweets_to_predict == 0:
+        print("No documents to predict. Exiting...")
+        sys.exit(0)
+
 
 device = torch.device("cuda")
 
@@ -86,28 +108,17 @@ def preprocess(text): # Preprocess text (username and link placeholders)
 
 # !!!IMPORTANT!!!
 # Change this according to the json line format.
-# Here the format for every line is like:
-# {id_str: text}
 def read_json_line(data):
-    id_str = list(data.keys())[0]
-    text = preprocess(data[id_str])
+    data_id = data["id"]
+    text = preprocess(str(data["text"]))
 
-    return id_str, text
+    return data_id, text
 
 if __name__ == "__main__":
-    # TODO: add progress bar
-
+    total_processed = 0
     if database_or_input_filename == "database": # if database
-        import pymongo
-        from pymongo import UpdateOne
-
-        # Connect to mongodb
-        mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
-        db = mongo_client["politus_twitter"]
-        tweet_col = db["tweets"]
-
         # NOTE: This find can be changed according to the task.
-        tweets_to_predict = tweet_col.find({task_name: None}, ["_id", "text"])
+        tweets_to_predict = tweet_col.find(query, ["_id", "text"])
 
         curr_batch = []
         for i, tweet in enumerate(tweets_to_predict):
@@ -115,6 +126,7 @@ if __name__ == "__main__":
             text = preprocess(tweet["text"])
 
             if len(text) > 0:
+                total_processed += 1
                 curr_batch.append({"_id": id_str, "text": text})
 
             if len(curr_batch) == batch_size:
@@ -123,7 +135,7 @@ if __name__ == "__main__":
                                    max_length=max_seq_length)
                 preds = model_predict(inputs)
 
-                curr_updates = [UpdateOne({"_id": curr_batch[pred_idx]}, {"$set": {task_name: pred}}) for pred_idx, pred in enumerate(preds)]
+                curr_updates = [UpdateOne({"_id": curr_batch[pred_idx]["_id"]}, {"$set": {task_name: pred}}) for pred_idx, pred in enumerate(preds)]
                 tweet_col.bulk_write(curr_updates, ordered=False)
 
                 curr_batch = []
@@ -135,12 +147,10 @@ if __name__ == "__main__":
                                max_length=max_seq_length)
             preds = model_predict(inputs)
 
-            curr_updates = [UpdateOne({"_id": curr_batch[pred_idx]}, {"$set": {task_name: pred}}) for pred_idx, pred in enumerate(preds)]
+            curr_updates = [UpdateOne({"_id": curr_batch[pred_idx]["_id"]}, {"$set": {task_name: pred}}) for pred_idx, pred in enumerate(preds)]
             tweet_col.bulk_write(curr_updates, ordered=False)
 
-
     else: # if filename
-
         output_file = open(output_filename, "w", encoding="utf-8")
         if database_or_input_filename.endswith(".json.gz"):
             input_file = gzip.open(database_or_input_filename, "rt", encoding="utf-8")
@@ -152,10 +162,11 @@ if __name__ == "__main__":
         curr_batch = []
         for i, line in enumerate(input_file):
             data = json.loads(line)
-            id_str, text = read_json_line(data)
+            data_id, text = read_json_line(data)
 
             if len(text) > 0:
-                curr_batch.append({"id_str": id_str, "text": text})
+                total_processed += 1
+                curr_batch.append({"id": data_id, "text": text})
 
             if len(curr_batch) == batch_size:
                 texts = [d["text"] for d in curr_batch]
@@ -185,3 +196,5 @@ if __name__ == "__main__":
                 output_file.write(json.dumps(curr_d, ensure_ascii=False) + "\n")
 
         output_file.close()
+
+    print("Processed {} tweets in total.".format(str(total_processed)))
