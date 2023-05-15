@@ -7,7 +7,6 @@ class TransformersData(torch.utils.data.Dataset):
         self.examples = examples
         self.label_map = label_map
 
-        self.label_map = label_map
         self.max_seq_length = max_seq_length
         self.tokenizer = tokenizer
         self.with_label = with_label

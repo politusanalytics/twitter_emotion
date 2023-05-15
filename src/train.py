@@ -26,7 +26,6 @@ only_test = False # Only perform testing
 predict = False # Predict instead of testing
 has_token_type_ids = False
 
-
 # # GoEmotions
 # train_filename = repo_path + "/data/go_emotions/train.json"
 # test_filename = repo_path + "/data/go_emotions/test.json"
@@ -42,7 +41,6 @@ test_filename = repo_path + "/data/affect_in_tweets/test.json"
 label_list = ["anger", "anticipation", "disgust", "fear", "joy", "love", "optimism", "pessimism",
               "sadness", "surprise", "trust"]
 dev_set_splitting = repo_path + "/data/affect_in_tweets/dev.json"
-
 
 # SETTINGS
 learning_rate = 2e-5
@@ -262,7 +260,10 @@ if __name__ == '__main__':
     if not only_test:
         encoder, classifier = build_model(train_examples, dev_examples, pretrained_transformers_model, n_epochs=num_epochs, curr_model_path=model_path)
         classifier.load_state_dict(torch.load(repo_path + "/models/classifier_" + model_path))
-        encoder.module.load_state_dict(torch.load(repo_path + "/models/encoder_" + model_path))
+        if torch.cuda.device_count() > 1 and device.type == "cuda" and len(device_ids) > 1:
+            encoder.module.load_state_dict(torch.load(repo_path + "/models/encoder_" + model_path))
+        else:
+            encoder.load_state_dict(torch.load(repo_path + "/models/encoder_" + model_path))
     else:
         tokenizer = AutoTokenizer.from_pretrained(pretrained_transformers_model)
         encoder = AutoModel.from_pretrained(pretrained_transformers_model)
